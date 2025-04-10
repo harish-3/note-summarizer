@@ -63,6 +63,10 @@ def set_active_tab(tab_name):
 
 def apply_theme():
     """Apply the current theme to the application."""
+    # Ensure theme is initialized
+    if 'theme' not in st.session_state:
+        st.session_state.theme = 'light'
+        
     if st.session_state.theme == 'dark':
         # Dark theme CSS
         st.markdown("""
@@ -169,6 +173,22 @@ def apply_theme():
 
 def main():
     """Main function to run the Streamlit application."""
+    # Initialize session state variables if they don't exist
+    if 'theme' not in st.session_state:
+        st.session_state.theme = 'light'
+    if 'summary' not in st.session_state:
+        st.session_state.summary = None
+    if 'flashcards' not in st.session_state:
+        st.session_state.flashcards = []
+    if 'current_flashcard' not in st.session_state:
+        st.session_state.current_flashcard = 0
+    if 'show_answer' not in st.session_state:
+        st.session_state.show_answer = False
+    if 'llm_configured' not in st.session_state:
+        st.session_state.llm_configured = False
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = "Upload"
+        
     # Apply the current theme
     apply_theme()
     
