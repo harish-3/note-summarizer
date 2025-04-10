@@ -1,196 +1,241 @@
 """
-Enhanced LLM Processor Module for Note Summarizer Application
+Enhanced LLM Processor with support for multiple providers
 
-This module handles the integration with multiple LLM models for generating summaries and flashcards.
+This module implements the LLM processing functionality with support for
+various LLM providers including OpenAI, Hugging Face, Anthropic, and Google.
 """
 
 import os
-from typing import Dict, List, Any, Optional
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from langchain.llms.base import BaseLLM
-from models.llm_provider import LLMProviderManager
-from models.prompt_templates import get_summary_prompt, get_flashcard_prompt
+from typing import Dict, Any, List, Optional
+import json
 
 class EnhancedLLMProcessor:
-    """Class to handle LLM processing with multiple provider options."""
+    """
+    Enhanced LLM processor that supports multiple providers.
+    """
     
-    def __init__(self, provider_id: str, model_id: str, api_key: Optional[str] = None,
+    def __init__(self, provider_id: str, model_id: str, api_key: Optional[str] = None, 
                  temperature: float = 0.5, max_tokens: int = 512):
         """
-        Initialize the enhanced LLM processor.
+        Initialize the LLM processor with the specified provider and model.
         
         Args:
-            provider_id: Provider ID (e.g., "huggingface", "openai")
-            model_id: Model ID (e.g., "google/flan-t5-base", "gpt-3.5-turbo")
-            api_key: Optional API key for the provider
-            temperature: Temperature parameter for the model
-            max_tokens: Maximum tokens parameter for the model
+            provider_id: ID of the LLM provider
+            model_id: ID of the specific model to use
+            api_key: API key for the provider (if required)
+            temperature: Temperature parameter for generation
+            max_tokens: Maximum tokens to generate
         """
-        # Initialize the LLM provider manager
-        self.provider_manager = LLMProviderManager()
-        
-        # Store configuration
         self.provider_id = provider_id
         self.model_id = model_id
+        self.api_key = api_key
         self.temperature = temperature
         self.max_tokens = max_tokens
         
-        # Create the LLM instance
-        self.llm = self.provider_manager.create_llm(
-            provider_id=provider_id,
-            model_id=model_id,
-            api_key=api_key,
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
-        
-        if not self.llm:
-            raise ValueError(f"Failed to initialize LLM with provider '{provider_id}' and model '{model_id}'")
-        
-        # Create prompt templates
-        self.summary_prompt = get_summary_prompt()
-        self.flashcard_prompt = get_flashcard_prompt()
-        
-        # Create LLM chains
-        self.summary_chain = LLMChain(llm=self.llm, prompt=self.summary_prompt)
-        self.flashcard_chain = LLMChain(llm=self.llm, prompt=self.flashcard_prompt)
+        # Initialize the appropriate LLM based on provider
+        self.llm = self._initialize_llm()
     
-    def generate_summary(self, notes: str) -> str:
+    def _initialize_llm(self):
+        """Initialize the appropriate LLM based on the provider."""
+        if self.provider_id == "openai":
+            return self._initialize_openai()
+        elif self.provider_id == "huggingface":
+            return self._initialize_huggingface()
+        elif self.provider_id == "anthropic":
+            return self._initialize_anthropic()
+        elif self.provider_id == "google":
+            return self._initialize_google()
+        elif self.provider_id == "local":
+            return self._initialize_local()
+        else:
+            raise ValueError(f"Unsupported provider: {self.provider_id}")
+    
+    def _initialize_openai(self):
+        """Initialize OpenAI LLM."""
+        try:
+            from langchain.llms import OpenAI
+            from langchain_openai import ChatOpenAI
+            
+            if not self.api_key:
+                raise ValueError("API key is required for OpenAI")
+            
+            os.environ["OPENAI_API_KEY"] = self.api_key
+            
+            return ChatOpenAI(
+                model_name=self.model_id,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens
+            )
+        except ImportError:
+            raise ImportError("OpenAI package not installed. Please install it with: pip install langchain-openai")
+        except Exception as e:
+            raise ValueError(f"Failed to initialize OpenAI LLM: {str(e)}")
+    
+    def _initialize_huggingface(self):
+        """Initialize Hugging Face LLM."""
+        try:
+            from langchain_community.llms import HuggingFaceHub
+            
+            if not self.api_key:
+                raise ValueError("API key is required for Hugging Face")
+            
+            os.environ["HUGGINGFACEHUB_API_TOKEN"] = self.api_key
+            
+            return HuggingFaceHub(
+                repo_id=self.model_id,
+                huggingfacehub_api_token=self.api_key,
+                model_kwargs={
+                    "temperature": self.temperature,
+                    "max_length": self.max_tokens
+                }
+            )
+        except ImportError:
+            raise ImportError("Hugging Face package not installed. Please install it with: pip install langchain-community")
+        except Exception as e:
+            raise ValueError(f"Failed to initialize Hugging Face LLM: {str(e)}")
+    
+    def _initialize_anthropic(self):
+        """Initialize Anthropic LLM."""
+        try:
+            from langchain_anthropic import ChatAnthropic
+            
+            if not self.api_key:
+                raise ValueError("API key is required for Anthropic")
+            
+            os.environ["ANTHROPIC_API_KEY"] = self.api_key
+            
+            return ChatAnthropic(
+                model=self.model_id,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                anthropic_api_key=self.api_key
+            )
+        except ImportError:
+            raise ImportError("Anthropic package not installed. Please install it with: pip install langchain-anthropic")
+        except Exception as e:
+            raise ValueError(f"Failed to initialize Anthropic LLM: {str(e)}")
+    
+    def _initialize_google(self):
+        """Initialize Google AI (Gemini) LLM."""
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            
+            if not self.api_key:
+                raise ValueError("API key is required for Google AI")
+            
+            os.environ["GOOGLE_API_KEY"] = self.api_key
+            
+            return ChatGoogleGenerativeAI(
+                model=self.model_id,
+                temperature=self.temperature,
+                max_output_tokens=self.max_tokens,
+                google_api_key=self.api_key
+            )
+        except ImportError:
+            raise ImportError("Google Generative AI package not installed. Please install it with: pip install langchain-google-genai")
+        except Exception as e:
+            raise ValueError(f"Failed to initialize Google AI LLM: {str(e)}")
+    
+    def _initialize_local(self):
+        """Initialize local LLM (placeholder for now)."""
+        # This would require additional setup for local models
+        raise NotImplementedError("Local models are not yet supported in this version")
+    
+    def process_notes(self, text: str) -> Dict[str, Any]:
         """
-        Generate a summary of the provided notes.
+        Process notes text to generate summary and flashcards.
         
         Args:
-            notes: Text content of the notes
+            text: The text content of the notes
             
         Returns:
-            Generated summary
+            Dictionary containing summary and flashcards
         """
-        return self.summary_chain.run(notes=notes)
-    
-    def generate_flashcards(self, notes: str) -> List[Dict[str, str]]:
-        """
-        Generate flashcards from the provided notes.
+        # Truncate text if too long
+        max_input_length = 4000
+        if len(text) > max_input_length:
+            text = text[:max_input_length] + "..."
         
-        Args:
-            notes: Text content of the notes
-            
-        Returns:
-            List of flashcards, each as a dictionary with 'question' and 'answer' keys
-        """
-        raw_flashcards = self.flashcard_chain.run(notes=notes)
+        # Generate summary
+        summary = self._generate_summary(text)
         
-        # Parse the raw flashcards text into a structured format
-        flashcards = []
-        current_question = None
-        current_answer = None
-        
-        for line in raw_flashcards.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-                
-            if line.startswith('Q:'):
-                # If we have a previous Q&A pair, add it to the list
-                if current_question and current_answer:
-                    flashcards.append({
-                        'question': current_question,
-                        'answer': current_answer
-                    })
-                
-                # Start a new Q&A pair
-                current_question = line[2:].strip()
-                current_answer = None
-            elif line.startswith('A:'):
-                current_answer = line[2:].strip()
-        
-        # Add the last Q&A pair if it exists
-        if current_question and current_answer:
-            flashcards.append({
-                'question': current_question,
-                'answer': current_answer
-            })
-        
-        return flashcards
-    
-    def process_notes(self, notes: str) -> Dict[str, Any]:
-        """
-        Process notes to generate both summary and flashcards.
-        
-        Args:
-            notes: Text content of the notes
-            
-        Returns:
-            Dictionary containing the generated summary and flashcards
-        """
-        summary = self.generate_summary(notes)
-        flashcards = self.generate_flashcards(notes)
+        # Generate flashcards
+        flashcards = self._generate_flashcards(text)
         
         return {
-            'summary': summary,
-            'flashcards': flashcards
+            "summary": summary,
+            "flashcards": flashcards
         }
     
-    @staticmethod
-    def get_available_providers() -> Dict[str, Dict]:
-        """
-        Get all available LLM providers.
+    def _generate_summary(self, text: str) -> str:
+        """Generate a summary of the notes."""
+        prompt = f"""
+        Please summarize the following academic notes in a concise but comprehensive manner.
+        Focus on the main concepts, key points, and important details.
         
-        Returns:
-            Dictionary of providers and their configurations
+        NOTES:
+        {text}
+        
+        SUMMARY:
         """
-        provider_manager = LLMProviderManager()
-        return provider_manager.get_providers()
+        
+        try:
+            if self.provider_id in ["openai", "anthropic", "google"]:
+                from langchain.schema import HumanMessage
+                response = self.llm.invoke([HumanMessage(content=prompt)])
+                return response.content
+            else:
+                response = self.llm.invoke(prompt)
+                return response
+        except Exception as e:
+            return f"Error generating summary: {str(e)}"
     
-    @staticmethod
-    def get_provider_names() -> List[str]:
-        """
-        Get list of provider display names.
+    def _generate_flashcards(self, text: str) -> List[Dict[str, str]]:
+        """Generate flashcards from the notes."""
+        prompt = f"""
+        Create 5 question-answer flashcards based on the following academic notes.
+        Focus on the most important concepts and facts.
+        Format your response as a JSON array of objects with 'question' and 'answer' fields.
         
-        Returns:
-            List of provider display names
-        """
-        provider_manager = LLMProviderManager()
-        return provider_manager.get_provider_names()
-    
-    @staticmethod
-    def get_models_for_provider(provider_id: str) -> List[Dict]:
-        """
-        Get available models for a specific provider.
+        NOTES:
+        {text}
         
-        Args:
-            provider_id: Provider ID
+        FLASHCARDS (JSON format):
+        """
+        
+        try:
+            if self.provider_id in ["openai", "anthropic", "google"]:
+                from langchain.schema import HumanMessage
+                response = self.llm.invoke([HumanMessage(content=prompt)])
+                response_text = response.content
+            else:
+                response_text = self.llm.invoke(prompt)
             
-        Returns:
-            List of models for the provider
-        """
-        provider_manager = LLMProviderManager()
-        return provider_manager.get_models_for_provider(provider_id)
-    
-    @staticmethod
-    def requires_api_key(provider_id: str) -> bool:
-        """
-        Check if a provider requires an API key.
-        
-        Args:
-            provider_id: Provider ID
+            # Extract JSON from response
+            json_start = response_text.find('[')
+            json_end = response_text.rfind(']') + 1
             
-        Returns:
-            True if the provider requires an API key, False otherwise
-        """
-        provider_manager = LLMProviderManager()
-        return provider_manager.requires_api_key(provider_id)
-    
-    @staticmethod
-    def get_api_key_instruction(provider_id: str) -> Optional[str]:
-        """
-        Get instructions for obtaining an API key for a provider.
-        
-        Args:
-            provider_id: Provider ID
+            if json_start >= 0 and json_end > json_start:
+                json_str = response_text[json_start:json_end]
+                try:
+                    flashcards = json.loads(json_str)
+                    return flashcards
+                except json.JSONDecodeError:
+                    # Fallback if JSON parsing fails
+                    pass
             
-        Returns:
-            Instructions or None if not applicable
-        """
-        provider_manager = LLMProviderManager()
-        return provider_manager.get_api_key_instruction(provider_id)
+            # If JSON extraction fails, create a default flashcard
+            return [
+                {
+                    "question": "What are the main topics covered in these notes?",
+                    "answer": "The notes cover various academic concepts. Please review the summary for details."
+                }
+            ]
+        except Exception as e:
+            # Return a default flashcard on error
+            return [
+                {
+                    "question": "Error creating flashcards",
+                    "answer": f"An error occurred: {str(e)}"
+                }
+            ]
