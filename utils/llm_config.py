@@ -1,5 +1,5 @@
 """
-LLM Configuration Interface for Note Summarizer Application
+Updated LLM Configuration Interface for Note Summarizer Application
 
 This module implements the Streamlit interface for LLM provider and API key configuration.
 """
@@ -17,7 +17,6 @@ def setup_llm_configuration() -> Tuple[str, str, Optional[str], float, int]:
         Tuple containing the selected provider ID, model ID, API key (if applicable),
         temperature, and max tokens.
     """
-    st.header("🤖 LLM Configuration")
     st.write("Configure the Language Model to use for generating summaries and flashcards.")
     
     # Initialize provider manager
@@ -113,9 +112,9 @@ def display_llm_status(provider_id: str, model_id: str) -> None:
                 model_name = model["name"]
                 break
         
-        st.sidebar.success(f"Using: {provider_name} - {model_name}")
+        st.success(f"Using: {provider_name} - {model_name}")
     else:
-        st.sidebar.warning("No LLM configured")
+        st.warning("No LLM configured")
 
 def save_llm_config_to_session_state(provider_id: str, model_id: str, 
                                     api_key: Optional[str], temperature: float, 
